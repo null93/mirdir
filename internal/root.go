@@ -7,11 +7,12 @@ import (
 )
 
 var (
-	Version    = "0.0.0"
-	ForceWrite = false
-	DryRun     = false
-	Preserve   = false
-	Verbose    = false
+	Version     = "0.0.0"
+	SkipPrompt  = false
+	DryRun      = false
+	DeleteEmpty = false
+	Preserve    = false
+	Verbose     = false
 )
 
 var RootCmd = &cobra.Command{
@@ -42,17 +43,28 @@ var RootCmd = &cobra.Command{
 			ExitWithError(4, "Failed rendering template", renderErr, Verbose)
 		}
 
-		for _, file := range output {
+		for _, path := range output {
+			isEmptyFile := path.IsEmptyFile()
+			doesExist := Exists(path.Path)
 			if DryRun {
-				file.Print()
+				path.Print(!isEmptyFile || !DeleteEmpty, Verbose)
 				continue
 			}
-			if Exists(file.Path) && !ForceWrite && !PromptOverwrite(file.Path, file.IsDir()) {
+			if isEmptyFile && doesExist && DeleteEmpty {
+				if !SkipPrompt && !PromptDelete(path.Path) {
+					continue
+				}
+				if deleteErr := path.Delete(); deleteErr != nil {
+					ExitWithError(5, "Failed deleting file", deleteErr, Verbose)
+				}
+				continue
+			} else if isEmptyFile && DeleteEmpty {
+				continue
+			} else if doesExist && !SkipPrompt && !PromptOverwrite(path.Path, path.IsDir()) {
 				continue
 			}
-			if writeErr := file.Write(Preserve); writeErr != nil {
-				ExitWithError(5, "Failed writing file", writeErr, Verbose)
-				panic(writeErr)
+			if writeErr := path.Write(Preserve); writeErr != nil {
+				ExitWithError(6, "Failed writing file", writeErr, Verbose)
 			}
 		}
 	},
@@ -60,8 +72,9 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	RootCmd.Flags().SortFlags = true
-	RootCmd.Flags().BoolVarP(&ForceWrite, "force", "f", ForceWrite, "overwrite existing without prompting")
+	RootCmd.Flags().BoolVarP(&SkipPrompt, "yes", "y", SkipPrompt, "don't ask, just do")
 	RootCmd.Flags().BoolVarP(&DryRun, "dry-run", "d", DryRun, "print output without writing")
+	RootCmd.Flags().BoolVarP(&DeleteEmpty, "delete-empty", "e", DeleteEmpty, "delete file if its only whitespace")
 	RootCmd.Flags().BoolVarP(&Preserve, "preserve", "p", Preserve, "preserve permissions and ownership")
 	RootCmd.Flags().BoolVarP(&Verbose, "verbose", "v", Verbose, "print verbose output")
 }

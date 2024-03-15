@@ -1,38 +1,15 @@
 package template
 
 import (
-	"bytes"
-	"fmt"
-	. "github.com/null93/mirdir/pkg/utils"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"syscall"
-	"text/template"
-)
-
-type PathType string
-
-const (
-	File      PathType = "file"
-	Directory PathType = "directory"
-	Link      PathType = "link"
 )
 
 type Template struct {
 	TemplateDirectory string
 	InputPaths        []Path
-}
-
-type Path struct {
-	Type        PathType
-	Path        string
-	Content     []byte
-	OwnerUid    uint32
-	OwnerGid    uint32
-	Permissions os.FileMode
-	LinkTarget  string
 }
 
 func NewTemplate(tmplDir string) (*Template, error) {
@@ -98,7 +75,7 @@ func NewTemplate(tmplDir string) (*Template, error) {
 
 func (tmpl *Template) Render(destDir string, preservePerms bool, values map[string]string) ([]Path, error) {
 	outputs := []Path{}
-	for _, input := range tmpl.InputPaths {
+	for key, input := range tmpl.InputPaths {
 		mode := input.Permissions
 		if !preservePerms && (input.Type == File || input.Type == Link) {
 			mode = os.FileMode(0666) // value before umask is applied
@@ -120,92 +97,9 @@ func (tmpl *Template) Render(destDir string, preservePerms bool, values map[stri
 			OwnerUid:    input.OwnerUid,
 			OwnerGid:    input.OwnerGid,
 			Permissions: mode,
+			Input:       &tmpl.InputPaths[key],
 		}
 		outputs = append(outputs, output)
 	}
 	return outputs, nil
-}
-
-func (p *Path) Print() {
-	if p.Type == Directory {
-		fmt.Printf("%s %4d:%-4d %s/\n", p.Permissions.String(), p.OwnerUid, p.OwnerGid, p.Path)
-	}
-	if p.Type == File {
-		fmt.Printf("%s %4d:%-4d %s\n%s\n", p.Permissions.String(), p.OwnerUid, p.OwnerGid, p.Path, string(p.Content))
-	}
-	if p.Type == Link {
-		fmt.Printf("%s %4d:%-4d %s -> %s\n", p.Permissions.String(), p.OwnerUid, p.OwnerGid, p.Path, p.LinkTarget)
-	}
-}
-
-func (p *Path) Write(preserveOwnership bool) error {
-	if p.Type == Directory {
-		if err := os.MkdirAll(p.Path, p.Permissions); err != nil {
-			return err
-		}
-	}
-	if p.Type == File {
-		if err := os.WriteFile(p.Path, p.Content, p.Permissions); err != nil {
-			return err
-		}
-	}
-	if p.Type == Link {
-		if Exists(p.Path) {
-			if err := os.Remove(p.Path); err != nil {
-				return err
-			}
-		}
-		if err := os.Symlink(p.LinkTarget, p.Path); err != nil {
-			return err
-		}
-	}
-	if preserveOwnership {
-		if err := os.Lchown(p.Path, int(p.OwnerUid), int(p.OwnerGid)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *Path) IsTemplate() bool {
-	return strings.HasSuffix(p.Path, ".tpl")
-}
-
-func (p *Path) GetRenderedContent(values interface{}) ([]byte, error) {
-	if p.IsTemplate() && p.Type == File {
-		tmpl, parseErr := template.New("").Parse(string(p.Content))
-		if parseErr != nil {
-			return nil, parseErr
-		}
-		var renderedContentBuffer bytes.Buffer
-		execErr := tmpl.Execute(&renderedContentBuffer, values)
-		if execErr != nil {
-			return nil, execErr
-		}
-		return renderedContentBuffer.Bytes(), nil
-	}
-	return p.Content, nil
-}
-
-func (p *Path) GetRenderedLinkTarget(values map[string]string) string {
-	if p.Type != Link {
-		return p.LinkTarget
-	}
-	result := p.LinkTarget
-	for key, value := range values {
-		result = strings.ReplaceAll(result, "["+key+"]", value)
-	}
-	return result
-}
-
-func (p *Path) GetRenderedPath(values map[string]string) string {
-	result := p.Path
-	for key, value := range values {
-		result = strings.ReplaceAll(result, "["+key+"]", value)
-	}
-	return strings.TrimSuffix(result, ".tpl")
-}
-
-func (p *Path) IsDir() bool {
-	return p.Type == Directory
 }

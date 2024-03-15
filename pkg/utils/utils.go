@@ -36,6 +36,15 @@ func PromptOverwrite(path string, isDir bool) bool {
 	return response == "y"
 }
 
+func PromptDelete(path string) bool {
+	response := ""
+	for response != "y" && response != "n" {
+		fmt.Printf("%q is empty. Delete? (y/n): ", path)
+		fmt.Scanln(&response)
+	}
+	return response == "y"
+}
+
 func GetEnvironmentalVars() map[string]string {
 	envVars := map[string]string{}
 	for _, envVar := range os.Environ() {
