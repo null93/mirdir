@@ -2,7 +2,9 @@
 
 ## About
 
-...
+`mirdir` is a command-line tool written in Go that allows you to copy a folder and mirror all the files from a source directory (`TPL_DIR`) to a destination directory (`DST_DIR`).  One of the key features of `mirdir` is its ability to process files ending in `.tpl` as Go templates. This allows you to use the powerful templating features of Go to generate content in your destination files.
+
+The tool also provides several optional flags, including one to preserve file ownership and permissions from the source directory, another is to delete blank files that are generated in the destination directory. Finally there is a 'dry run' flag that allows you to preview the changes that would be made without actually applying them.
 
 ## Install
 
