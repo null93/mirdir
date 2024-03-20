@@ -1,4 +1,9 @@
 # mirdir (mirror directory)
+> CLI tool that mirrors and templates a directory structure
+
+<div align="center" >
+  <img src="docs/help-menu.svg" width="75%" >
+</div>
 
 ## About
 
